@@ -50,20 +50,37 @@ export async function POST(request: Request) {
       .slice(0, 10)
       .map(([country, pct]) => ({ country, pct }))
 
-    const { error } = await supabase
+    // Verificar se ja existe snapshot desta semana
+    const { data: existing } = await supabase
       .from('instagram_audience_snapshots')
-      .upsert(
-        {
-          week_start: weekStart,
-          age_ranges: ageRanges,
-          gender,
-          top_cities: topCities,
-          top_countries: topCountries,
-          active_hours: audience.online_followers,
-          active_days: null, // Calculado a partir de online_followers se necessario
-        },
-        { onConflict: 'week_start' }
-      )
+      .select('id')
+      .eq('week_start', weekStart)
+      .limit(1)
+      .single()
+
+    const payload = {
+      week_start: weekStart,
+      age_ranges: ageRanges,
+      gender,
+      top_cities: topCities,
+      top_countries: topCountries,
+      active_hours: audience.online_followers,
+      active_days: null,
+    }
+
+    let error
+    if (existing) {
+      const res = await supabase
+        .from('instagram_audience_snapshots')
+        .update(payload)
+        .eq('id', existing.id)
+      error = res.error
+    } else {
+      const res = await supabase
+        .from('instagram_audience_snapshots')
+        .insert(payload)
+      error = res.error
+    }
 
     if (error) throw new Error(error.message)
 

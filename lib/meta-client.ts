@@ -332,50 +332,77 @@ export async function getAudienceInsights(
   token: string,
   userId: string
 ): Promise<AudienceInsights> {
-  // Buscar dados demograficos em paralelo
-  const [ageGenderUrl, locationUrl, hoursUrl] = [
-    buildUrl(`/${userId}/insights`, {
-      metric: 'audience_gender_age',
-      period: 'lifetime',
-      access_token: token,
-    }),
-    buildUrl(`/${userId}/insights`, {
-      metric: 'audience_city,audience_country',
-      period: 'lifetime',
-      access_token: token,
-    }),
-    buildUrl(`/${userId}/insights`, {
-      metric: 'online_followers',
-      period: 'lifetime',
-      access_token: token,
-    }),
-  ]
+  // API v21+ usa follower_demographics com breakdowns
+  type BreakdownResult = {
+    data: Array<{
+      name: string
+      total_value?: {
+        breakdowns: Array<{
+          dimension_keys: string[]
+          results: Array<{ dimension_values: string[]; value: number }>
+        }>
+      }
+      values?: Array<{ value: Record<string, number> }>
+    }>
+  }
 
-  const [ageGenderRes, locationRes, hoursRes] = await Promise.all([
-    fetchWithRetry(ageGenderUrl) as Promise<{
-      data: Array<{ name: string; values: Array<{ value: Record<string, number> }> }>
-    }>,
-    fetchWithRetry(locationUrl) as Promise<{
-      data: Array<{ name: string; values: Array<{ value: Record<string, number> }> }>
-    }>,
-    fetchWithRetry(hoursUrl) as Promise<{
-      data: Array<{ name: string; values: Array<{ value: Record<string, number> }> }>
-    }>,
+  const [ageGenderRes, cityRes, countryRes] = await Promise.all([
+    fetchWithRetry(
+      buildUrl(`/${userId}/insights`, {
+        metric: 'follower_demographics',
+        period: 'lifetime',
+        metric_type: 'total_value',
+        breakdown: 'age,gender',
+        access_token: token,
+      })
+    ) as Promise<BreakdownResult>,
+    fetchWithRetry(
+      buildUrl(`/${userId}/insights`, {
+        metric: 'follower_demographics',
+        period: 'lifetime',
+        metric_type: 'total_value',
+        breakdown: 'city',
+        access_token: token,
+      })
+    ) as Promise<BreakdownResult>,
+    fetchWithRetry(
+      buildUrl(`/${userId}/insights`, {
+        metric: 'follower_demographics',
+        period: 'lifetime',
+        metric_type: 'total_value',
+        breakdown: 'country',
+        access_token: token,
+      })
+    ) as Promise<BreakdownResult>,
   ])
 
-  const findMetric = (
-    res: { data: Array<{ name: string; values: Array<{ value: Record<string, number> }> }> },
-    name: string
-  ): Record<string, number> => {
-    const item = res.data.find((d) => d.name === name)
-    return item?.values[0]?.value ?? {}
+  // Parse age_gender: results have dimension_values ["25-34", "F"]
+  const ageGender: Record<string, number> = {}
+  const breakdowns = ageGenderRes.data?.[0]?.total_value?.breakdowns?.[0]?.results ?? []
+  for (const r of breakdowns) {
+    const [age, gender] = r.dimension_values
+    ageGender[`${gender}.${age}`] = r.value
+  }
+
+  // Parse cities
+  const cities: Record<string, number> = {}
+  const cityResults = cityRes.data?.[0]?.total_value?.breakdowns?.[0]?.results ?? []
+  for (const r of cityResults) {
+    cities[r.dimension_values[0]] = r.value
+  }
+
+  // Parse countries
+  const countries: Record<string, number> = {}
+  const countryResults = countryRes.data?.[0]?.total_value?.breakdowns?.[0]?.results ?? []
+  for (const r of countryResults) {
+    countries[r.dimension_values[0]] = r.value
   }
 
   return {
-    age_gender: findMetric(ageGenderRes, 'audience_gender_age'),
-    cities: findMetric(locationRes, 'audience_city'),
-    countries: findMetric(locationRes, 'audience_country'),
-    online_followers: findMetric(hoursRes, 'online_followers'),
+    age_gender: ageGender,
+    cities,
+    countries,
+    online_followers: {}, // online_followers retorna vazio na API atual
   }
 }
 
