@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { generateMonthlyReport, reportToHtml } from '@/lib/report-generator'
 import { Resend } from 'resend'
+import { validateCronSecret } from '@/lib/auth'
 
 // GET — gera e retorna o relatorio como HTML
 export async function GET() {
@@ -23,10 +24,8 @@ export async function GET() {
 // POST — gera e envia por email via Resend (chamado pelo cron)
 export async function POST(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const authError = validateCronSecret(request)
+    if (authError) return authError
 
     const resendKey = process.env.RESEND_API_KEY
     const recipientEmail = process.env.REPORT_RECIPIENT_EMAIL

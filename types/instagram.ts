@@ -202,3 +202,93 @@ export interface AudienceInsights {
   countries: Record<string, number>
   online_followers: Record<string, number>
 }
+
+// ==========================================
+// Campaign Studio — Types
+// ==========================================
+
+export type CampaignStatus = 'DRAFT' | 'GENERATING' | 'REVIEW' | 'APPROVED' | 'SCHEDULED' | 'ARCHIVED'
+
+export type CampaignPostStatus = 'PENDING' | 'APPROVED' | 'REVISION_REQUESTED'
+
+export type PostFormat = 'REEL' | 'CAROUSEL' | 'IMAGE' | 'STORY'
+
+export type DocumentSourceType = 'PDF' | 'WEBSITE' | 'MANUAL'
+
+export interface KnowledgeDocument {
+  id: string
+  title: string
+  source_type: DocumentSourceType
+  source_url: string | null
+  file_name: string | null
+  description: string | null
+  is_active: boolean
+  chunk_count?: number
+  indexed_at: string
+  created_at: string
+}
+
+export interface DocumentChunk {
+  id: string
+  document_id: string
+  chunk_index: number
+  content: string
+  token_count: number | null
+  embedding: number[] | null
+  metadata: Record<string, unknown> | null
+  created_at: string
+}
+
+export interface SearchResult {
+  id: string
+  content: string
+  metadata: Record<string, unknown> | null
+  document_id: string
+  similarity: number
+}
+
+export interface Campaign {
+  id: string
+  title: string
+  status: CampaignStatus
+  objective: string | null
+  target_audience: string | null
+  theme: string | null
+  tone_notes: string | null
+  duration_days: number | null
+  start_date: string | null
+  preferred_formats: PostFormat[] | null
+  context_chunks_used: number | null
+  model_used: string | null
+  generation_time_ms: number | null
+  generated_at: string | null
+  campaign_summary: string | null
+  strategic_rationale: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CampaignPost {
+  id: string
+  campaign_id: string
+  post_order: number
+  format: PostFormat
+  scheduled_for: string | null
+  caption: string | null
+  hashtags: string[] | null
+  cta: string | null
+  visual_brief: string | null
+  reel_concept: string | null
+  reel_duration: string | null
+  audio_suggestion: string | null
+  slides: Record<string, unknown>[] | null
+  strategic_note: string | null
+  caption_edited: string | null
+  hashtags_edited: string[] | null
+  visual_notes: string | null
+  status: CampaignPostStatus
+  analyst_notes: string | null
+  calendar_entry_id: string | null
+  created_at: string
+  updated_at: string
+}

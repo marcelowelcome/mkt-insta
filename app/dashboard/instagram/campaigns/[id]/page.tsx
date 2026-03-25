@@ -1,0 +1,249 @@
+'use client'
+
+import { useEffect, useState, useCallback } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Separator } from '@/components/ui/separator'
+import PostEditor from '@/components/instagram/campaigns/PostEditor'
+import CampaignTimeline from '@/components/instagram/campaigns/CampaignTimeline'
+import ScheduleButton from '@/components/instagram/campaigns/ScheduleButton'
+import type { Campaign, CampaignPost } from '@/types/instagram'
+
+const STATUS_BADGE: Record<string, { label: string; className: string }> = {
+  DRAFT: { label: 'Rascunho', className: 'bg-gray-50 text-gray-500' },
+  GENERATING: { label: 'Gerando...', className: 'bg-blue-50 text-blue-500' },
+  REVIEW: { label: 'Em Revisao', className: 'bg-purple-50 text-purple-600' },
+  APPROVED: { label: 'Aprovada', className: 'bg-green-50 text-green-600' },
+  SCHEDULED: { label: 'Agendada', className: 'bg-indigo-50 text-indigo-600' },
+  ARCHIVED: { label: 'Arquivada', className: 'bg-gray-50 text-gray-400' },
+}
+
+export default function CampaignEditorPage() {
+  const params = useParams()
+  const router = useRouter()
+  const campaignId = params.id as string
+
+  const [campaign, setCampaign] = useState<Campaign | null>(null)
+  const [posts, setPosts] = useState<CampaignPost[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const loadData = useCallback(async () => {
+    try {
+      const [campRes, postsRes] = await Promise.all([
+        fetch(`/api/campaigns/${campaignId}`),
+        fetch(`/api/campaigns/${campaignId}/posts`),
+      ])
+
+      if (campRes.ok) {
+        setCampaign(await campRes.json())
+      }
+      if (postsRes.ok) {
+        setPosts(await postsRes.json())
+      }
+    } catch {
+      // silent
+    } finally {
+      setLoading(false)
+    }
+  }, [campaignId])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  function handlePostUpdate(updated: CampaignPost) {
+    setPosts((prev) =>
+      prev.map((p) => (p.id === updated.id ? updated : p))
+    )
+    // Reload campaign to get updated status
+    fetch(`/api/campaigns/${campaignId}`)
+      .then((r) => r.json())
+      .then(setCampaign)
+      .catch(() => {})
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-32 w-full" />
+        <div className="grid gap-3">
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-48 w-full" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!campaign) {
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        Campanha nao encontrada.
+      </div>
+    )
+  }
+
+  const statusCfg = STATUS_BADGE[campaign.status] ?? STATUS_BADGE.DRAFT
+  const sortedPosts = [...posts].sort((a, b) => a.post_order - b.post_order)
+  const approvedCount = posts.filter((p) => p.status === 'APPROVED').length
+  const pendingCount = posts.filter((p) => p.status === 'PENDING').length
+  const revisionCount = posts.filter((p) => p.status === 'REVISION_REQUESTED').length
+
+  return (
+    <div className="space-y-6">
+      {/* Back */}
+      <Link
+        href="/dashboard/instagram/campaigns"
+        className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+      >
+        ← Voltar para campanhas
+      </Link>
+
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight">{campaign.title}</h1>
+            <Badge variant="secondary" className={`text-xs ${statusCfg.className}`}>
+              {statusCfg.label}
+            </Badge>
+          </div>
+          {campaign.theme && (
+            <p className="text-sm text-muted-foreground mt-1">{campaign.theme}</p>
+          )}
+        </div>
+
+        {/* Schedule button — only when all approved */}
+        {campaign.status === 'APPROVED' && (
+          <ScheduleButton
+            campaignId={campaignId}
+            onScheduled={() => {
+              loadData()
+              router.refresh()
+            }}
+          />
+        )}
+
+        {campaign.status === 'SCHEDULED' && (
+          <div className="flex items-center gap-2 text-sm text-indigo-600">
+            <span>📅</span>
+            <span>Campanha agendada no calendario editorial</span>
+          </div>
+        )}
+      </div>
+
+      {/* Summary */}
+      {campaign.campaign_summary && (
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Resumo Estrategico</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm">{campaign.campaign_summary}</p>
+            {campaign.strategic_rationale && (
+              <p className="text-xs text-muted-foreground mt-2">
+                {campaign.strategic_rationale}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        {campaign.duration_days && (
+          <MiniCard label="Duracao" value={`${campaign.duration_days} dias`} />
+        )}
+        {campaign.start_date && (
+          <MiniCard
+            label="Inicio"
+            value={new Date(campaign.start_date).toLocaleDateString('pt-BR')}
+          />
+        )}
+        <MiniCard label="Total" value={String(posts.length)} />
+        <MiniCard
+          label="Aprovados"
+          value={`${approvedCount}/${posts.length}`}
+          valueClass={approvedCount === posts.length ? 'text-green-600' : undefined}
+        />
+        {campaign.generation_time_ms && (
+          <MiniCard
+            label="Geracao"
+            value={`${(campaign.generation_time_ms / 1000).toFixed(0)}s`}
+          />
+        )}
+      </div>
+
+      {/* Progress */}
+      {posts.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Progresso de aprovacao</span>
+            <span>
+              {approvedCount} aprovados · {pendingCount} pendentes
+              {revisionCount > 0 && ` · ${revisionCount} em revisao`}
+            </span>
+          </div>
+          <div className="h-2 bg-muted rounded-full overflow-hidden flex">
+            <div
+              className="h-full bg-green-500 transition-all"
+              style={{ width: `${(approvedCount / posts.length) * 100}%` }}
+            />
+            <div
+              className="h-full bg-yellow-400 transition-all"
+              style={{ width: `${(revisionCount / posts.length) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Timeline */}
+      <CampaignTimeline posts={posts} />
+
+      <Separator />
+
+      {/* Posts */}
+      <div>
+        <h2 className="text-lg font-semibold mb-4">
+          Posts da Campanha ({posts.length})
+        </h2>
+        {sortedPosts.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhum post gerado ainda.</p>
+        ) : (
+          <div className="grid gap-4">
+            {sortedPosts.map((post) => (
+              <PostEditor
+                key={post.id}
+                post={post}
+                campaignId={campaignId}
+                onUpdate={handlePostUpdate}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function MiniCard({
+  label,
+  value,
+  valueClass,
+}: {
+  label: string
+  value: string
+  valueClass?: string
+}) {
+  return (
+    <Card className="border-0 shadow-sm">
+      <CardContent className="p-3 text-center">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className={`text-lg font-semibold ${valueClass ?? ''}`}>{value}</p>
+      </CardContent>
+    </Card>
+  )
+}
