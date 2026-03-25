@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { validateCronSecret } from '@/lib/auth'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { buildPrompt, type CampaignBriefing } from '@/lib/campaign/prompt-builder'
 import { extractJSON } from '@/lib/campaign/campaign-parser'
@@ -8,11 +7,9 @@ import { extractJSON } from '@/lib/campaign/campaign-parser'
 /**
  * POST /api/campaigns/generate
  * Gera uma campanha completa via Claude API com streaming.
- * Requer CRON_SECRET.
+ * Chamado pelo BriefingForm no dashboard (acao do usuario).
  */
 export async function POST(request: Request) {
-  const authError = validateCronSecret(request)
-  if (authError) return authError
 
   const startTime = Date.now()
 
