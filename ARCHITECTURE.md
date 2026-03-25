@@ -27,7 +27,8 @@ O projeto segue os mesmos padroes arquiteturais do DashWT (dashboard de vendas d
 | Auth | CRON_SECRET via lib/auth.ts (centralizado) |
 | Fonte de dados | Meta Graph API v21.0 (Instagram Graph API) |
 | Deploy | Vercel |
-| Cron Jobs | Vercel Cron |
+| Cron Jobs | Supabase pg_cron + pg_net |
+| Storage | Supabase Storage (story media) |
 | Email Reports | Resend |
 
 ---
@@ -62,7 +63,7 @@ Dashboard renderizado no browser
       error.tsx                         <- Error boundary global do modulo
       /posts/page.tsx                   <- Grid de posts com filtros, ordenacao, paginacao
       /reels/page.tsx                   <- Reels analytics (views, completion, engagement)
-      /stories/page.tsx                 <- Stories tracker
+      /stories/page.tsx                 <- Stories com thumbnails persistentes + video player
       /growth/page.tsx                  <- Historico de seguidores + metricas
       /audience/page.tsx                <- Dados demograficos (idade, genero, cidade)
       /hashtags/page.tsx                <- Hashtag Intelligence com trend
@@ -72,7 +73,7 @@ Dashboard renderizado no browser
 
 /app/api/instagram
   /sync/route.ts                        <- Cron principal (posts + reels + snapshots + content scores)
-  /sync-stories/route.ts                <- Cron stories (6h)
+  /sync-stories/route.ts                <- Cron stories (diario) + persistencia de media no Storage
   /sync-audience/route.ts               <- Cron audiencia semanal (demograficos)
   /posts/route.ts                       <- GET posts (paginacao, filtros, ordenacao)
   /reels/route.ts                       <- GET reels (paginacao, filtros, ordenacao)
@@ -90,6 +91,7 @@ Dashboard renderizado no browser
   supabase.ts                           <- Clientes Supabase (server + browser)
   analytics.ts                          <- Funcoes puras de calculo (engagement, QEI, scores)
   auth.ts                               <- Auth centralizada (validateCronSecret, escapeHtml)
+  storage.ts                            <- Persistencia de media no Supabase Storage
   report-generator.ts                   <- Geracao de relatorio HTML mensal
   constants.ts                          <- Constantes (API URL, pesos, cores, formatadores)
   utils.ts                              <- Utilitario cn() para classes Tailwind
@@ -166,8 +168,8 @@ idx_competitor_snapshots_date ON instagram_competitor_snapshots(date DESC)
 | Lista de midias | `GET /{user_id}/media?fields=id,media_type,media_product_type,caption,permalink,thumbnail_url,timestamp` | Paginacao cursor-based |
 | Insights de post | `GET /{media_id}/insights?metric=reach,saved,shares` + `GET /{media_id}?fields=like_count,comments_count` | `impressions` removido para midias na v22+ |
 | Insights de Reel | `GET /{media_id}/insights?metric=reach,saved,shares,comments,likes,ig_reels_avg_watch_time,views` | `views` substitui `plays` desde abr/2025 |
-| Stories ativos | `GET /{user_id}/stories?fields=id,timestamp` | Apenas enquanto story esta ativo |
-| Insights de story | `GET /{media_id}/insights?metric=reach,impressions,exits,replies,taps_forward,taps_back` | |
+| Stories ativos | `GET /{user_id}/stories?fields=id,media_type,media_url,thumbnail_url,permalink,timestamp` | Apenas enquanto story esta ativo |
+| Insights de story | `GET /{media_id}/insights?metric=reach,replies,navigation,follows,profile_visits,shares,total_interactions` | v22+: impressions, exits, taps removidos |
 | Insights da conta | `GET /{user_id}/insights?metric=reach,profile_views,website_clicks&metric_type=total_value&period=day&since=X&until=Y` | v21+ usa `metric_type=total_value` |
 | Demograficos | `GET /{user_id}/insights?metric=follower_demographics&period=lifetime&metric_type=total_value&breakdown=age,gender` | v21+ usa `follower_demographics` com `breakdown` |
 | Cidades | `GET /{user_id}/insights?metric=follower_demographics&period=lifetime&metric_type=total_value&breakdown=city` | |
@@ -186,23 +188,18 @@ idx_competitor_snapshots_date ON instagram_competitor_snapshots(date DESC)
 
 ## 7. Cron Jobs (Vercel Cron)
 
-```json
-{
-  "crons": [
-    { "path": "/api/instagram/sync", "schedule": "0 11 * * *" },
-    { "path": "/api/instagram/sync-stories", "schedule": "0 */6 * * *" },
-    { "path": "/api/instagram/sync-audience", "schedule": "0 11 * * 1" },
-    { "path": "/api/instagram/report", "schedule": "0 8 1 * *" }
-  ]
-}
-```
+Cron jobs migrados do Vercel para **Supabase pg_cron + pg_net** (Vercel Hobby nao suporta crons sub-diarios).
+Setup em: `supabase/migrations/002_pg_cron_setup.sql`
 
-| Job | Frequencia | O que faz |
+| Job | Schedule | O que faz |
 |---|---|---|
-| `sync` | Diario as 8h BRT (11h UTC) | Posts, Reels, insights da conta, snapshot de seguidores, recalcula content scores (batch por tier) |
-| `sync-stories` | A cada 6h | Stories ativos (expiram em 24h) |
-| `sync-audience` | Semanal (segunda 8h BRT) | Snapshot demografico via `follower_demographics` |
-| `report` | Mensal (dia 1 as 5h BRT) | Gera relatorio HTML e envia por email via Resend |
+| `dashig-sync-daily` | `0 11 * * *` (8h BRT) | Posts, Reels, insights da conta, snapshot de seguidores, recalcula content scores (batch) |
+| `dashig-sync-stories` | `0 14 * * *` (11h BRT) | Stories ativos + persistencia de thumbs/videos no Supabase Storage |
+| `dashig-sync-audience` | `0 11 * * 1` (seg 8h BRT) | Snapshot demografico via `follower_demographics` (numeros convertidos para %) |
+| `dashig-report-monthly` | `0 8 1 * *` (dia 1, 5h BRT) | Gera relatorio HTML e envia por email via Resend |
+
+Gerenciar: `SELECT * FROM cron.job WHERE jobname LIKE 'dashig-%';`
+Historico: `SELECT * FROM cron.job_run_details WHERE jobname LIKE 'dashig-%' ORDER BY start_time DESC LIMIT 20;`
 
 Todos os cron jobs validam `CRON_SECRET` via `lib/auth.ts:validateCronSecret()`.
 
@@ -322,8 +319,17 @@ CRON_SECRET=              # Secret para autenticar cron jobs (min 32 chars)
 - [x] Calendario Editorial integrado (CRUD mensal)
 - [x] Exportacao de dados (CSV — posts, reels, hashtags)
 
+### Infraestrutura (CONCLUIDA)
+- [x] Deploy no Vercel (https://mkt-insta.vercel.app)
+- [x] Cron jobs via Supabase pg_cron + pg_net
+- [x] Supabase Storage para persistencia de media de stories
+- [x] Auditoria de seguranca e performance
+- [x] Auth centralizada (lib/auth.ts)
+- [x] Error boundaries
+- [x] XSS prevention no report generator
+- [x] Batch content score recalculation
+
 ### Proximos passos
-- [ ] Deploy no Vercel + configuracao de cron jobs em producao
 - [ ] Autenticacao de usuario (Supabase Auth) para proteger o dashboard
 - [ ] Inteligencia automatica (insights, recomendacoes, AI summary)
 - [ ] Dark mode toggle
@@ -334,8 +340,25 @@ CRON_SECRET=              # Secret para autenticar cron jobs (min 32 chars)
 ## 12. Decisoes Tecnicas Importantes
 
 1. **shadcn/ui v3 (Radix)**: O projeto usa shadcn/ui compativel com Tailwind CSS v3 e Radix primitives. A versao 4 (base-ui) NAO e compativel com Next.js 14.
-2. **Meta API v21+**: Metricas de conta usam `metric_type=total_value`. Demograficos usam `follower_demographics` com `breakdown`. `impressions` foi removido.
-3. **Batch content scores**: Recalculo de content scores usa batch update por tier (4 queries) em vez de update individual por post (N queries).
+2. **Meta API v21/v22**: Metricas de conta usam `metric_type=total_value`. Demograficos usam `follower_demographics` com `breakdown`. `impressions` removido para conta e midias. Stories usam `navigation` em vez de `taps_forward/taps_back/exits`.
+3. **Batch content scores**: Recalculo usa batch update por tier (4 queries) em vez de update individual (N queries).
 4. **Auth centralizada**: `lib/auth.ts` centraliza validacao de CRON_SECRET e sanitizacao HTML.
-5. **Error boundaries**: `app/dashboard/instagram/error.tsx` captura erros de rendering em todas as sub-paginas.
-6. **QEI no frontend**: QEI e calculado em runtime no frontend para permitir ajuste futuro de pesos sem reprocessar dados.
+5. **Error boundaries**: `app/dashboard/instagram/error.tsx` captura erros de rendering.
+6. **QEI no frontend**: Calculado em runtime para permitir ajuste futuro de pesos.
+7. **Stories persistidos**: Thumbnails (jpg) e videos (mp4) salvos no Supabase Storage (bucket `story-media`). Videos usam `thumbnail_url` da API para gerar imagem de preview. Player inline no card ao clicar.
+8. **pg_cron**: Cron jobs migrados do Vercel (limitacao Hobby) para Supabase pg_cron + pg_net. Sem restricao de frequencia.
+9. **Audiencia em %**: API retorna numeros absolutos de seguidores por cidade/pais. Convertemos para percentual antes de salvar.
+
+---
+
+## 13. Migracoes SQL
+
+Executar em ordem no SQL Editor do Supabase:
+
+| Arquivo | Descricao |
+|---------|-----------|
+| `supabase/migrations/001_initial_schema.sql` | Schema completo (9 tabelas + indices + app_config) |
+| `supabase/migrations/002_pg_cron_setup.sql` | pg_cron + pg_net para 4 cron jobs |
+| `supabase/migrations/003_stories_new_fields.sql` | Campos media_type, media_url, permalink, follows, shares, navigation para stories |
+| `supabase/migrations/004_stories_storage.sql` | Bucket story-media + stored_media_url |
+| `supabase/migrations/005_stories_video_url.sql` | stored_video_url para videos persistidos |

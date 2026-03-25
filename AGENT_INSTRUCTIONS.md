@@ -102,22 +102,36 @@ Voce esta desenvolvendo o **DashIG**, um dashboard de analytics de Instagram par
 6. Upsert em `instagram_posts` ou `instagram_reels`
 7. Recalcula content scores em **batch por tier** (4 queries)
 
-### 5.2 `meta-client.ts` — Wrapper da Graph API v21+
+### 5.2 `/api/instagram/sync-stories` — Cron de Stories
+1. Valida CRON_SECRET
+2. Busca stories ativos com `media_type, media_url, thumbnail_url, permalink`
+3. Para cada story: busca insights (reach, replies, navigation, follows, shares, etc.)
+4. Persiste thumbnail no Supabase Storage (`thumbs/{media_id}.jpg`) — para videos usa `thumbnail_url`
+5. Persiste video no Storage (`videos/{media_id}.mp4`) se `media_type === 'VIDEO'`
+6. Upsert com `stored_media_url` e `stored_video_url` (URLs permanentes)
+
+### 5.3 `meta-client.ts` — Wrapper da Graph API v21+
 ```typescript
 getAccountInfo(token, userId?)           -> AccountInfo
 getMediaList(token, userId, maxItems?)   -> MediaItem[]
 getMediaInsights(token, mediaId, type)   -> MediaInsights
 getAccountInsights(token, userId)        -> AccountInsights
-getActiveStories(token, userId)          -> StoryItem[]
-getStoryInsights(token, mediaId)         -> StoryInsights
-getAudienceInsights(token, userId)       -> AudienceInsights  // follower_demographics
+getActiveStories(token, userId)          -> StoryItem[]  // inclui media_url, thumbnail_url
+getStoryInsights(token, mediaId)         -> StoryInsights // reach, replies, navigation, follows, shares
+getAudienceInsights(token, userId)       -> AudienceInsights  // follower_demographics com breakdowns
 refreshLongLivedToken(token)             -> { token, expiresAt }
 getAccessToken()                         -> string
 checkTokenExpiration()                   -> { isExpiring, daysLeft }
 saveToken(token, expiresAt)              -> void
 ```
 
-### 5.3 `analytics.ts` — Funcoes Puras
+### 5.4 `storage.ts` — Persistencia de Media
+```typescript
+persistStoryMedia(imageUrl, mediaId)     -> string | null  // URL publica do thumb
+persistStoryVideo(videoUrl, mediaId)     -> string | null  // URL publica do video
+```
+
+### 5.5 `analytics.ts` — Funcoes Puras
 ```typescript
 calcEngagementRate(likes, comments, saves, shares, reach) -> number
 calcQEI(likes, comments, saves, shares, reach)            -> number
