@@ -289,7 +289,7 @@ export async function getActiveStories(
   userId: string
 ): Promise<StoryItem[]> {
   const url = buildUrl(`/${userId}/stories`, {
-    fields: 'id,timestamp',
+    fields: 'id,media_type,media_url,permalink,timestamp',
     access_token: token,
   })
 
@@ -304,9 +304,9 @@ export async function getStoryInsights(
   token: string,
   mediaId: string
 ): Promise<StoryInsights> {
-  // v22+: exits, taps_forward, taps_back, impressions removidos
+  // v22+: exits, taps_forward, taps_back, impressions, likes removidos
   const url = buildUrl(`/${mediaId}/insights`, {
-    metric: 'reach,replies,navigation',
+    metric: 'reach,replies,navigation,follows,profile_visits,shares,total_interactions',
     access_token: token,
   })
 
@@ -321,11 +321,12 @@ export async function getStoryInsights(
 
   return {
     reach: metricsMap['reach'] ?? 0,
-    impressions: metricsMap['impressions'] ?? 0,
-    exits: 0, // removido na API v21+
     replies: metricsMap['replies'] ?? 0,
-    taps_forward: metricsMap['navigation'] ?? 0, // navigation substitui taps
-    taps_back: 0, // removido na API v21+
+    navigation: metricsMap['navigation'] ?? 0,
+    follows: metricsMap['follows'] ?? 0,
+    profile_visits: metricsMap['profile_visits'] ?? 0,
+    shares: metricsMap['shares'] ?? 0,
+    total_interactions: metricsMap['total_interactions'] ?? 0,
   }
 }
 

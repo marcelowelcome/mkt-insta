@@ -71,6 +71,9 @@ export interface InstagramReel {
 export interface InstagramStory {
   id: string
   media_id: string
+  media_type: string | null
+  media_url: string | null
+  permalink: string | null
   timestamp: string | null
   expires_at: string | null
   reach: number
@@ -79,6 +82,11 @@ export interface InstagramStory {
   replies: number
   taps_forward: number
   taps_back: number
+  navigation: number
+  follows: number
+  profile_visits: number
+  shares: number
+  total_interactions: number
   synced_at: string
 }
 
@@ -169,16 +177,20 @@ export interface MediaInsights {
 
 export interface StoryItem {
   id: string
+  media_type: string
+  media_url?: string
+  permalink?: string
   timestamp: string
 }
 
 export interface StoryInsights {
   reach: number
-  impressions: number
-  exits: number
   replies: number
-  taps_forward: number
-  taps_back: number
+  navigation: number
+  follows: number
+  profile_visits: number
+  shares: number
+  total_interactions: number
 }
 
 export interface AudienceInsights {

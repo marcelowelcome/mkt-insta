@@ -33,14 +33,18 @@ export async function POST(request: Request) {
       const { error } = await supabase.from('instagram_stories').upsert(
         {
           media_id: story.id,
+          media_type: story.media_type ?? null,
+          media_url: story.media_url ?? null,
+          permalink: story.permalink ?? null,
           timestamp: story.timestamp,
           expires_at: expiresAt,
           reach: insights.reach,
-          impressions: insights.impressions,
-          exits: insights.exits,
           replies: insights.replies,
-          taps_forward: insights.taps_forward,
-          taps_back: insights.taps_back,
+          navigation: insights.navigation,
+          follows: insights.follows,
+          profile_visits: insights.profile_visits,
+          shares: insights.shares,
+          total_interactions: insights.total_interactions,
           synced_at: new Date().toISOString(),
         },
         { onConflict: 'media_id' }
