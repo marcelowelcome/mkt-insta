@@ -12,19 +12,29 @@ export async function GET() {
 
     if (compError) throw compError
 
-    // Buscar ultimo snapshot de cada concorrente
-    const results = []
-    for (const comp of competitors ?? []) {
-      const { data: snapshot } = await supabase
-        .from('instagram_competitor_snapshots')
-        .select('*')
-        .eq('competitor_id', comp.id)
-        .order('date', { ascending: false })
-        .limit(1)
-        .single()
+    // Buscar todos os snapshots mais recentes em uma unica query
+    const compIds = (competitors ?? []).map((c) => c.id)
+    const { data: allSnapshots } = compIds.length > 0
+      ? await supabase
+          .from('instagram_competitor_snapshots')
+          .select('*')
+          .in('competitor_id', compIds)
+          .order('date', { ascending: false })
+      : { data: [] }
 
-      results.push({ ...comp, latest_snapshot: snapshot ?? null })
+    // Agrupar por competitor_id (pegar apenas o mais recente)
+    const snapList = allSnapshots ?? []
+    const snapshotMap = new Map<string, (typeof snapList)[number]>()
+    for (const snap of snapList) {
+      if (!snapshotMap.has(snap.competitor_id)) {
+        snapshotMap.set(snap.competitor_id, snap)
+      }
     }
+
+    const results = (competitors ?? []).map((comp) => ({
+      ...comp,
+      latest_snapshot: snapshotMap.get(comp.id) ?? null,
+    }))
 
     return NextResponse.json({ data: results })
   } catch (err) {

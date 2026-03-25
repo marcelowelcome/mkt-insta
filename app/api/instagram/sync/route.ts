@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { validateCronSecret } from '@/lib/auth'
 import {
   getAccessToken,
   checkTokenExpiration,
@@ -18,11 +19,8 @@ import {
 
 export async function POST(request: Request) {
   try {
-    // Validar CRON_SECRET
-    const authHeader = request.headers.get('authorization')
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const authError = validateCronSecret(request)
+    if (authError) return authError
 
     const supabase = createServerSupabaseClient()
     const userId = process.env.META_IG_USER_ID
@@ -158,7 +156,7 @@ export async function POST(request: Request) {
 async function recalculateContentScores(
   supabase: ReturnType<typeof createServerSupabaseClient>
 ) {
-  // Posts
+  // Posts — batch por tier para minimizar queries
   const { data: posts } = await supabase
     .from('instagram_posts')
     .select('id, engagement_rate')
@@ -169,17 +167,25 @@ async function recalculateContentScores(
       .filter((r): r is number => r !== null)
     const { mean, stdDev } = calcMeanAndStdDev(rates)
 
+    // Agrupar IDs por score
+    const scoreGroups: Record<string, string[]> = { VIRAL: [], GOOD: [], AVERAGE: [], WEAK: [] }
     for (const post of posts) {
       if (post.engagement_rate === null) continue
       const score = calcContentScore(post.engagement_rate, mean, stdDev)
+      scoreGroups[score].push(post.id)
+    }
+
+    // Batch update por tier (4 queries em vez de N)
+    for (const [score, ids] of Object.entries(scoreGroups)) {
+      if (ids.length === 0) continue
       await supabase
         .from('instagram_posts')
         .update({ content_score: score })
-        .eq('id', post.id)
+        .in('id', ids)
     }
   }
 
-  // Reels — calcula baseado em engagement com reach
+  // Reels — mesmo batch approach
   const { data: reels } = await supabase
     .from('instagram_reels')
     .select('id, likes, comments, saves, shares, reach')
@@ -190,12 +196,18 @@ async function recalculateContentScores(
     )
     const { mean, stdDev } = calcMeanAndStdDev(rates)
 
+    const scoreGroups: Record<string, string[]> = { VIRAL: [], GOOD: [], AVERAGE: [], WEAK: [] }
     for (let i = 0; i < reels.length; i++) {
       const score = calcContentScore(rates[i], mean, stdDev)
+      scoreGroups[score].push(reels[i].id)
+    }
+
+    for (const [score, ids] of Object.entries(scoreGroups)) {
+      if (ids.length === 0) continue
       await supabase
         .from('instagram_reels')
         .update({ content_score: score })
-        .eq('id', reels[i].id)
+        .in('id', ids)
     }
   }
 }

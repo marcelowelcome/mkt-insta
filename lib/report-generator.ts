@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from './supabase'
 import { calcEngagementRate, formatNumber, formatPercent } from './analytics'
+import { escapeHtml } from './auth'
 
 export interface MonthlyReport {
   month: string
@@ -197,7 +198,7 @@ export function reportToHtml(report: MonthlyReport): string {
     <tr><th>Conteudo</th><th>Tipo</th><th>Engage</th><th>Alcance</th></tr>
     ${report.topPosts.map((p) => `
     <tr>
-      <td>${p.caption || 'Sem legenda'}</td>
+      <td>${escapeHtml(p.caption || 'Sem legenda')}</td>
       <td>${p.type}</td>
       <td><strong>${formatPercent(p.engagementRate)}</strong></td>
       <td>${formatNumber(p.reach)}</td>
@@ -210,7 +211,7 @@ export function reportToHtml(report: MonthlyReport): string {
     <tr><th>Conteudo</th><th>Views</th><th>Engage</th><th>Alcance</th></tr>
     ${report.topReels.map((r) => `
     <tr>
-      <td>${r.caption || 'Sem legenda'}</td>
+      <td>${escapeHtml(r.caption || 'Sem legenda')}</td>
       <td>${formatNumber(r.views)}</td>
       <td><strong>${formatPercent(r.engagementRate)}</strong></td>
       <td>${formatNumber(r.reach)}</td>

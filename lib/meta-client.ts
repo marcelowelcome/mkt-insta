@@ -304,8 +304,9 @@ export async function getStoryInsights(
   token: string,
   mediaId: string
 ): Promise<StoryInsights> {
+  // v22+: exits, taps_forward, taps_back, impressions removidos
   const url = buildUrl(`/${mediaId}/insights`, {
-    metric: 'reach,impressions,exits,replies,taps_forward,taps_back',
+    metric: 'reach,replies,navigation',
     access_token: token,
   })
 
@@ -321,10 +322,10 @@ export async function getStoryInsights(
   return {
     reach: metricsMap['reach'] ?? 0,
     impressions: metricsMap['impressions'] ?? 0,
-    exits: metricsMap['exits'] ?? 0,
+    exits: 0, // removido na API v21+
     replies: metricsMap['replies'] ?? 0,
-    taps_forward: metricsMap['taps_forward'] ?? 0,
-    taps_back: metricsMap['taps_back'] ?? 0,
+    taps_forward: metricsMap['navigation'] ?? 0, // navigation substitui taps
+    taps_back: 0, // removido na API v21+
   }
 }
 

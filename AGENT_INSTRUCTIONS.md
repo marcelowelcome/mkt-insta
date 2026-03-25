@@ -1,195 +1,148 @@
 # AGENT_INSTRUCTIONS.md — DashIG
-> Instruções operacionais para agentes de IA que trabalham neste projeto
+> Instrucoes operacionais para agentes de IA que trabalham neste projeto
 
 ---
 
-## 1. Contexto rápido
+## 1. Contexto rapido
 
-Você está desenvolvendo o **DashIG**, um dashboard de analytics de Instagram para a Welcome Trips. Antes de começar qualquer tarefa, leia o `ARCHITECTURE.md` (estrutura técnica) e o `PROMPT_CONTEXT.md` (domínio de negócio).
+Voce esta desenvolvendo o **DashIG**, um dashboard de analytics de Instagram para a **Welcome Weddings** (@welcomeweddings). Antes de comecar qualquer tarefa, leia o `ARCHITECTURE.md` (estrutura tecnica) e o `PROMPT_CONTEXT.md` (dominio de negocio).
 
-**Stack**: Next.js 14 · TypeScript · Supabase · Tailwind CSS · shadcn/ui · Recharts · Meta Graph API · Vercel
+**Stack**: Next.js 14 · TypeScript · Supabase · Tailwind CSS · shadcn/ui (v3/Radix) · Recharts · Meta Graph API v21.0 · Vercel
+
+**Estado atual**: Todas as 5 fases do roadmap estao implementadas. O sistema esta funcional com dados reais da @welcomeweddings.
 
 ---
 
-## 2. Como iniciar uma sessão de desenvolvimento
+## 2. Como iniciar uma sessao de desenvolvimento
 
 ### 2.1 Checklist de onboarding
-Ao iniciar uma nova sessão, confirme:
+- [ ] Leu o `ARCHITECTURE.md`?
+- [ ] Leu o `PROMPT_CONTEXT.md`?
+- [ ] Qual feature ou bug sera trabalhado?
+- [ ] O dev server esta rodando? (`npm run dev -- -p 3001`)
+- [ ] Se houver erro de cache: `rm -rf .next && npm run dev`
 
-- [ ] Você leu o `ARCHITECTURE.md`?
-- [ ] Você leu o `PROMPT_CONTEXT.md`?
-- [ ] Qual fase do roadmap está sendo desenvolvida?
-- [ ] Qual módulo/componente específico será trabalhado nesta sessão?
-
-### 2.2 Perguntas para fazer antes de codar
-Se a tarefa for ambígua, pergunte:
-1. "Este é um Server Component ou Client Component?"
-2. "Os dados já existem no Supabase ou preciso criar o cron de sync primeiro?"
-3. "Este endpoint é chamado pelo dashboard ou pelo cron job?"
-4. "Qual é o comportamento esperado quando os dados estão vazios?"
+### 2.2 Perguntas antes de codar
+1. "Este e um Server Component ou Client Component?"
+2. "Os dados ja existem no Supabase ou preciso rodar sync?"
+3. "Este endpoint e chamado pelo dashboard ou pelo cron job?"
+4. "Qual e o comportamento esperado quando os dados estao vazios?"
 
 ---
 
-## 3. Regras de desenvolvimento (OBRIGATÓRIAS)
+## 3. Regras de desenvolvimento (OBRIGATORIAS)
 
 ### 3.1 TypeScript
-- **Sempre** usar TypeScript. Sem `any` explícito — use `unknown` e faça type guards.
-- Todos os tipos de entidades do Instagram estão (ou devem estar) em `/types/instagram.ts`.
-- Antes de criar um novo tipo, verificar se já existe em `instagram.ts`.
+- **Sempre** usar TypeScript. Sem `any` — use `unknown` e type guards.
+- Todos os tipos estao em `/types/instagram.ts`. Verificar antes de criar novos.
 
 ### 3.2 Supabase
 - **Nunca** usar `SUPABASE_SERVICE_ROLE_KEY` em componentes client-side.
-- Usar o cliente server em API Routes: `createServerClient()` de `@/lib/supabase`.
-- Usar o cliente browser em Client Components: `createBrowserClient()`.
-- **Sempre** fazer upsert com `ON CONFLICT DO UPDATE` — nunca delete + insert.
-- Sempre verificar o campo `error` antes de usar `data`.
+- Server: `createServerSupabaseClient()` de `@/lib/supabase`
+- Browser: `createBrowserSupabaseClient()` de `@/lib/supabase`
+- **Sempre** upsert com `ON CONFLICT DO UPDATE` — nunca delete + insert.
+- **Sempre** verificar `error` antes de usar `data`.
 
-```typescript
-// ✅ Correto
-const { data, error } = await supabase.from('instagram_posts').select('*')
-if (error) throw new Error(error.message)
-
-// ❌ Errado
-const { data } = await supabase.from('instagram_posts').select('*')
-console.log(data) // pode ser null
-```
-
-### 3.3 Meta Graph API
-- Toda chamada à API do Meta deve passar pelo `meta-client.ts` — nunca chamar diretamente com fetch espalhado pelo código.
-- Sempre tratar rate limits (código 400/429) com retry com backoff exponencial.
-- O token de acesso vem sempre da tabela `app_config` no Supabase, nunca de variável de ambiente diretamente (exceto no setup inicial).
-- **Views > Plays**: nos Reels, usar sempre a métrica `views`. A métrica `plays` foi descontinuada em abril/2025.
+### 3.3 Meta Graph API v21+
+- Toda chamada via `meta-client.ts` — nunca fetch direto.
+- Rate limits com retry/backoff exponencial (ja implementado).
+- Token de `app_config` no Supabase (fallback env apenas setup inicial).
+- **Views > Plays**: nos Reels, sempre `views`.
+- **follower_demographics com breakdown**: demograficos usam `breakdown=age,gender` etc.
+- **metric_type=total_value**: insights de conta usam este formato.
+- **impressions removido**: nao usar impressions para conta ou midias individuais.
 
 ### 3.4 Componentes React
-- Separar claramente Server Components (busca de dados) de Client Components (interatividade).
-- Gráficos (Recharts) sempre em Client Components com diretiva `'use client'`.
-- Sempre implementar:
-  - Estado de **loading** (skeleton ou spinner)
-  - Estado de **erro** com mensagem amigável
-  - Estado **vazio** (empty state com instrução ao usuário)
+- Graficos (Recharts) sempre em Client Components com `'use client'`.
+- Sempre implementar: loading (skeleton), erro (mensagem), vazio (empty state).
+- Todos os calculos em `lib/analytics.ts`, nunca inline.
 
-```typescript
-// Padrão de componente com os três estados
-if (isLoading) return <SkeletonCard />
-if (error) return <ErrorMessage message={error} />
-if (!data || data.length === 0) return <EmptyState message="Nenhum dado disponível ainda." />
-return <ComponenteReal data={data} />
-```
+### 3.5 Autenticacao de cron jobs
+- Usar `validateCronSecret()` de `lib/auth.ts` em TODAS as rotas de sync.
+- Nunca duplicar a logica de validacao — sempre usar o helper centralizado.
 
-### 3.5 Cálculos de métricas
-- **Nunca** calcular `engagement_rate`, `QEI` ou `content_score` inline nos componentes.
-- Todos os cálculos ficam em `/lib/analytics.ts`.
-- Funções puras, testáveis, sem efeitos colaterais.
-
-```typescript
-// /lib/analytics.ts
-export function calcEngagementRate(likes: number, comments: number, saves: number, shares: number, reach: number): number {
-  if (reach === 0) return 0
-  return ((likes + comments + saves + shares) / reach) * 100
-}
-
-export function calcQEI(likes: number, comments: number, saves: number, shares: number, reach: number): number {
-  if (reach === 0) return 0
-  return ((likes * 1) + (comments * 2) + (saves * 4) + (shares * 5)) / reach * 100
-}
-
-export function calcContentScore(engagementRate: number, mean: number, stdDev: number): ContentScore {
-  if (engagementRate >= mean + stdDev) return 'VIRAL'
-  if (engagementRate >= mean) return 'GOOD'
-  if (engagementRate >= mean - stdDev) return 'AVERAGE'
-  return 'WEAK'
-}
-```
+### 3.6 HTML/XSS
+- Ao inserir dados do usuario em HTML, usar `escapeHtml()` de `lib/auth.ts`.
 
 ---
 
-## 4. Padrões de UI
+## 4. Padroes de UI
 
 ### 4.1 Design system
-- Usar **shadcn/ui** para todos os componentes base (Card, Table, Badge, Button, Select, etc.)
-- Usar **Tailwind CSS** para estilização — sem CSS modules, sem styled-components.
-- Paleta de cores para Content Score:
-  - 🔥 VIRAL: `text-orange-500` / `bg-orange-50`
-  - ✅ GOOD: `text-green-600` / `bg-green-50`
-  - ⚠️ AVERAGE: `text-yellow-600` / `bg-yellow-50`
-  - ❌ WEAK: `text-red-500` / `bg-red-50`
+- **shadcn/ui v3** (Radix primitives) — NAO usar v4 (base-ui, incompativel com Tailwind v3).
+- **Tailwind CSS v3** — sem CSS modules, sem styled-components.
+- Cards: `border-0 shadow-sm hover:shadow-md transition-all`
+- Paleta Content Score:
+  - VIRAL: `text-orange-500` / `bg-orange-50`
+  - GOOD: `text-green-600` / `bg-green-50`
+  - AVERAGE: `text-yellow-600` / `bg-yellow-50`
+  - WEAK: `text-red-500` / `bg-red-50`
 
-### 4.2 Gráficos (Recharts)
-- Sempre usar `ResponsiveContainer` com `width="100%"`.
-- Cores primárias do projeto: `#4F46E5` (indigo) e `#06B6D4` (cyan).
-- Tooltips sempre em português.
-- Eixo Y: sempre formatar números grandes com `Intl.NumberFormat('pt-BR')`.
+### 4.2 Graficos (Recharts)
+- Sempre `ResponsiveContainer width="100%" height="100%"`
+- Cores: `#4F46E5` (indigo), `#06B6D4` (cyan)
+- Tooltips em portugues com `contentStyle` customizado
+- Gradientes via `<defs><linearGradient>`
 
 ### 4.3 Tabelas
-- Usar `Table` do shadcn/ui.
-- Sempre permitir ordenação por coluna nos posts/reels.
-- Paginação a partir de 20 itens.
+- Usar `Table` do shadcn/ui com `rounded-lg border overflow-hidden`
+- Headers com `bg-muted/30`
+- Ordenacao por coluna clicavel
 
 ---
 
-## 5. Módulos e responsabilidades
+## 5. Modulos e responsabilidades
 
-### 5.1 `/api/instagram/sync` — Cron Job Principal
-**O que faz:**
-1. Busca token de acesso no Supabase (`app_config`)
-2. Verifica expiração do token (alerta se < 15 dias)
-3. Chama `meta-client.ts` para buscar posts, reels e métricas da conta
-4. Normaliza os dados
-5. Faz upsert no Supabase
-6. Calcula e atualiza `content_score` de todos os posts
+### 5.1 `/api/instagram/sync` — Cron Principal
+1. Valida CRON_SECRET via `validateCronSecret()`
+2. Busca token de `app_config`, verifica expiracao
+3. Busca account info + account insights
+4. Busca media list (paginacao cursor, limite configuravel via `?limit=`)
+5. Para cada midia: busca insights, classifica Reel vs Post
+6. Upsert em `instagram_posts` ou `instagram_reels`
+7. Recalcula content scores em **batch por tier** (4 queries)
 
-**Não faz:** não busca stories (job separado), não busca audiência (job semanal separado).
-
-### 5.2 `/api/instagram/sync-stories` — Cron Job de Stories
-**O que faz:**
-1. Busca stories ativos na conta
-2. Para cada story ativo, busca insights individuais
-3. Upsert em `instagram_stories`
-
-**Atenção:** Stories expiram em 24h. Este job roda a cada 6h. Registrar `expires_at` para filtrar no frontend.
-
-### 5.3 `meta-client.ts` — Wrapper da Graph API
-Deve expor funções específicas, nunca URLs raw:
-
+### 5.2 `meta-client.ts` — Wrapper da Graph API v21+
 ```typescript
-export async function getAccountInfo(token: string): Promise<AccountInfo>
-export async function getMediaList(token: string, userId: string): Promise<MediaItem[]>
-export async function getMediaInsights(token: string, mediaId: string, mediaType: MediaType): Promise<MediaInsights>
-export async function getAccountInsights(token: string, userId: string): Promise<AccountInsights>
-export async function getAudienceInsights(token: string, userId: string): Promise<AudienceInsights>
-export async function getActiveStories(token: string, userId: string): Promise<StoryItem[]>
-export async function refreshLongLivedToken(token: string): Promise<string>
+getAccountInfo(token, userId?)           -> AccountInfo
+getMediaList(token, userId, maxItems?)   -> MediaItem[]
+getMediaInsights(token, mediaId, type)   -> MediaInsights
+getAccountInsights(token, userId)        -> AccountInsights
+getActiveStories(token, userId)          -> StoryItem[]
+getStoryInsights(token, mediaId)         -> StoryInsights
+getAudienceInsights(token, userId)       -> AudienceInsights  // follower_demographics
+refreshLongLivedToken(token)             -> { token, expiresAt }
+getAccessToken()                         -> string
+checkTokenExpiration()                   -> { isExpiring, daysLeft }
+saveToken(token, expiresAt)              -> void
 ```
 
-### 5.4 `HeatmapPostingTime.tsx` — Melhor Hora para Postar
-- Recebe dados de `audience_snapshots` (active_hours, active_days) e histórico de posts
-- Cruza audiência ativa com performance histórica por slot de hora/dia
-- Renderiza uma grade 7×24 (dias × horas) com intensidade de cor
-- Destaca os 3 melhores slots com recomendação explícita
-
-### 5.5 `HashtagTable.tsx` — Hashtag Intelligence
-- Lê os arrays `hashtags` de todos os posts
-- Agrega: frequência de uso, média de reach, média de engagement_rate por hashtag
-- Calcula trend das últimas 4 semanas (crescimento/queda)
-- Ordena por "impacto estimado" = avg_reach × avg_engagement_rate
+### 5.3 `analytics.ts` — Funcoes Puras
+```typescript
+calcEngagementRate(likes, comments, saves, shares, reach) -> number
+calcQEI(likes, comments, saves, shares, reach)            -> number
+calcContentScore(engagementRate, mean, stdDev)             -> ContentScore
+calcMeanAndStdDev(values)                                  -> { mean, stdDev }
+calcCompletionRate(avgWatchTime, duration)                 -> number | null
+extractHashtags(caption)                                   -> string[]
+formatNumber(n)                                            -> string  // pt-BR
+formatPercent(n)                                           -> string  // pt-BR
+```
 
 ---
 
-## 6. Sequência recomendada para o MVP
+## 6. Sequencia para retomar desenvolvimento
 
-Se você está começando do zero, siga esta ordem:
+Se voce esta retomando o projeto:
 
 ```
-1. Setup do projeto Next.js 14 + configuração do Supabase
-2. Criação das tabelas no Supabase (scripts em ARCHITECTURE.md §5)
-3. Implementar meta-client.ts (funções básicas: account info + media list + insights)
-4. Implementar /api/instagram/sync (cron job)
-5. Testar sync manualmente via POST request
-6. Implementar Overview page com KPIs básicos
-7. Implementar Posts page com grid e métricas
-8. Implementar Growth chart (histórico de seguidores)
-9. Deploy no Vercel + configurar cron job
-10. Implementar sync de stories
+1. npm install (se necessario)
+2. Verificar .env.local (credenciais Meta + Supabase + CRON_SECRET)
+3. npm run dev -- -p 3001
+4. Se erro de cache: rm -rf .next && npm run dev
+5. Verificar dados no Supabase (instagram_posts, instagram_reels devem ter registros)
+6. Se banco vazio: curl -X POST http://localhost:3001/api/instagram/sync -H "Authorization: Bearer {CRON_SECRET}"
+7. Acessar http://localhost:3001/dashboard/instagram
 ```
 
 ---
@@ -198,35 +151,38 @@ Se você está começando do zero, siga esta ordem:
 
 | Erro | Como evitar |
 |---|---|
-| Usar `plays` como métrica de Reel | Usar sempre `views` — plays foi descontinuado em abr/2025 |
-| Token expirado em produção | Salvar token no Supabase + verificar expiração no sync |
-| Delete + insert em vez de upsert | Sempre usar `upsert` com `onConflict: 'media_id'` |
-| Cálculo de engajamento sem verificar reach = 0 | Sempre guardar com `if (reach === 0) return 0` |
-| Chamar Graph API diretamente nos componentes | Toda chamada à API passa por `meta-client.ts` |
-| Service role key no client component | `SUPABASE_SERVICE_ROLE_KEY` apenas em Route Handlers |
-| Stories sem paginação | Stories podem passar de 30/dia — sempre tratar paginação da API |
+| `Cannot find module './682.js'` | Limpar cache: `rm -rf .next && npm run dev` |
+| shadcn/ui v4 incompativel | Usar apenas componentes v3 (Radix). Nunca `@base-ui/react` |
+| `following_count` nao existe | Removido na API v21+. Usar apenas `followers_count, media_count` |
+| `impressions` erro na API | Removido para conta e midias. Nao usar |
+| `audience_gender_age` erro | Usar `follower_demographics` com `breakdown=age,gender` |
+| Token expirado | Verificar `app_config` no Supabase. Refresh via `/api/instagram/refresh-token` |
+| N+1 queries | Usar batch queries (ver competitors, content scores como exemplo) |
+| XSS no report | Usar `escapeHtml()` de `lib/auth.ts` |
 
 ---
 
 ## 8. Checklist antes de finalizar uma tarefa
 
-- [ ] O código compila sem erros TypeScript?
-- [ ] Todos os estados (loading, erro, vazio) estão implementados?
-- [ ] Dados sensíveis (token, service key) estão apenas server-side?
-- [ ] A função de cálculo de métricas está em `analytics.ts`, não inline?
-- [ ] O upsert usa `ON CONFLICT DO UPDATE`, não delete + insert?
-- [ ] Os gráficos usam `ResponsiveContainer`?
-- [ ] Os números grandes estão formatados em pt-BR?
-- [ ] A documentação (`ARCHITECTURE.md`) precisa ser atualizada com algo novo?
+- [ ] `npx tsc --noEmit` sem erros?
+- [ ] `npm run build` sem erros?
+- [ ] Todos os estados (loading, erro, vazio) implementados?
+- [ ] Dados sensiveis apenas server-side?
+- [ ] Calculos em `analytics.ts`, nao inline?
+- [ ] Upsert com `ON CONFLICT DO UPDATE`?
+- [ ] Graficos com `ResponsiveContainer`?
+- [ ] Numeros formatados em pt-BR?
+- [ ] Auth via `validateCronSecret()` (se cron route)?
+- [ ] HTML sanitizado com `escapeHtml()` (se aplicavel)?
 
 ---
 
-## 9. Referências rápidas
+## 9. Referencias rapidas
 
-- Docs Meta Graph API: https://developers.facebook.com/docs/instagram-api
-- Permissões necessárias: `instagram_basic`, `instagram_manage_insights`, `pages_read_engagement`
+- Meta Graph API v21+: https://developers.facebook.com/docs/instagram-api
+- Permissoes: `instagram_basic`, `instagram_manage_insights`, `pages_read_engagement`
 - Supabase JS v2: https://supabase.com/docs/reference/javascript
-- shadcn/ui components: https://ui.shadcn.com/docs/components
+- shadcn/ui (v3): https://v0.dev/docs (referencia para componentes Radix-based)
 - Recharts: https://recharts.org/en-US/api
-- Resend (email): https://resend.com/docs/api-reference/introduction
-- Vercel Cron: https://vercel.com/docs/cron-jobs/manage-cron-jobs
+- Resend: https://resend.com/docs/api-reference
+- Vercel Cron: https://vercel.com/docs/cron-jobs

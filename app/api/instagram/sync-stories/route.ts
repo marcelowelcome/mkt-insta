@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { validateCronSecret } from '@/lib/auth'
 import {
   getAccessToken,
   getActiveStories,
@@ -8,11 +9,8 @@ import {
 
 export async function POST(request: Request) {
   try {
-    // Validar CRON_SECRET
-    const authHeader = request.headers.get('authorization')
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const authError = validateCronSecret(request)
+    if (authError) return authError
 
     const supabase = createServerSupabaseClient()
     const userId = process.env.META_IG_USER_ID

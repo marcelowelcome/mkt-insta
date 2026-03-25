@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server'
+import { validateCronSecret } from '@/lib/auth'
 import { getAccessToken, refreshLongLivedToken } from '@/lib/meta-client'
 
 export async function POST(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const authError = validateCronSecret(request)
+    if (authError) return authError
 
     const currentToken = await getAccessToken()
     const { token, expiresAt } = await refreshLongLivedToken(currentToken)

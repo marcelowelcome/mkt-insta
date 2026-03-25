@@ -38,17 +38,25 @@ export async function POST(request: Request) {
       }
     }
 
-    // Top cities
+    // Top cities — API retorna numeros absolutos, converter para %
+    const totalCityFollowers = Object.values(audience.cities).reduce((s, v) => s + v, 0)
     const topCities = Object.entries(audience.cities)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 10)
-      .map(([city, pct]) => ({ city, pct }))
+      .map(([city, count]) => ({
+        city,
+        pct: totalCityFollowers > 0 ? Number(((count / totalCityFollowers) * 100).toFixed(1)) : 0,
+      }))
 
-    // Top countries
+    // Top countries — API retorna numeros absolutos, converter para %
+    const totalCountryFollowers = Object.values(audience.countries).reduce((s, v) => s + v, 0)
     const topCountries = Object.entries(audience.countries)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 10)
-      .map(([country, pct]) => ({ country, pct }))
+      .map(([country, count]) => ({
+        country,
+        pct: totalCountryFollowers > 0 ? Number(((count / totalCountryFollowers) * 100).toFixed(1)) : 0,
+      }))
 
     // Verificar se ja existe snapshot desta semana
     const { data: existing } = await supabase
