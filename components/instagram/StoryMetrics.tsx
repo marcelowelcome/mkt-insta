@@ -114,21 +114,35 @@ export default function StoryMetrics() {
 }
 
 function StoryCard({ story }: { story: InstagramStory }) {
+  const [showVideo, setShowVideo] = useState(false)
   const thumbUrl = story.stored_media_url ?? story.media_url
+  const videoUrl = story.stored_video_url ?? (story.media_type === 'VIDEO' ? story.media_url : null)
   const isExpired = story.expires_at ? new Date(story.expires_at) < new Date() : true
   const isVideo = story.media_type === 'VIDEO'
 
   return (
-    <a
-      href={story.permalink ?? '#'}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group block"
-    >
+    <div className="group block">
       <Card className="overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-200">
-        {/* Thumbnail */}
-        <div className="relative aspect-[9/16] overflow-hidden bg-muted">
-          {thumbUrl ? (
+        {/* Media */}
+        <div
+          className="relative aspect-[9/16] overflow-hidden bg-muted cursor-pointer"
+          onClick={() => {
+            if (isVideo && videoUrl) {
+              setShowVideo(!showVideo)
+            } else if (story.permalink) {
+              window.open(story.permalink, '_blank')
+            }
+          }}
+        >
+          {showVideo && videoUrl ? (
+            <video
+              src={videoUrl}
+              controls
+              autoPlay
+              playsInline
+              className="h-full w-full object-cover"
+            />
+          ) : thumbUrl ? (
             <Image
               src={thumbUrl}
               alt="Story"
@@ -142,41 +156,55 @@ function StoryCard({ story }: { story: InstagramStory }) {
             </div>
           )}
 
-          {/* Status + type badges */}
-          <div className="absolute inset-x-0 top-0 flex items-start justify-between p-1.5">
-            <Badge
-              variant="secondary"
-              className={`text-[8px] border-0 backdrop-blur-sm ${
-                isExpired ? 'bg-black/50 text-white/70' : 'bg-emerald-500/80 text-white'
-              }`}
-            >
-              {isExpired ? 'Expirado' : 'Ativo'}
-            </Badge>
-            {isVideo && (
-              <Badge variant="secondary" className="bg-black/50 text-white border-0 text-[8px] backdrop-blur-sm">
-                Video
-              </Badge>
-            )}
-          </div>
+          {/* Play button para videos */}
+          {isVideo && videoUrl && !showVideo && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-transform group-hover:scale-110">
+                <span className="ml-0.5 text-sm">▶</span>
+              </div>
+            </div>
+          )}
 
-          {/* Metrics overlay */}
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 pt-6">
-            <div className="flex items-center justify-between text-[10px] text-white">
-              <span className="font-semibold">{formatNumber(story.reach)} alcance</span>
-              {(story.navigation ?? 0) > 0 && (
-                <span className="opacity-80">{formatNumber(story.navigation ?? 0)} nav</span>
+          {/* Status + type badges */}
+          {!showVideo && (
+            <div className="absolute inset-x-0 top-0 flex items-start justify-between p-1.5">
+              <Badge
+                variant="secondary"
+                className={`text-[8px] border-0 backdrop-blur-sm ${
+                  isExpired ? 'bg-black/50 text-white/70' : 'bg-emerald-500/80 text-white'
+                }`}
+              >
+                {isExpired ? 'Expirado' : 'Ativo'}
+              </Badge>
+              {isVideo && (
+                <Badge variant="secondary" className="bg-black/50 text-white border-0 text-[8px] backdrop-blur-sm">
+                  Video
+                </Badge>
               )}
             </div>
-          </div>
+          )}
+
+          {/* Metrics overlay */}
+          {!showVideo && (
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 pt-6">
+              <div className="flex items-center justify-between text-[10px] text-white">
+                <span className="font-semibold">{formatNumber(story.reach)} alcance</span>
+                {(story.navigation ?? 0) > 0 && (
+                  <span className="opacity-80">{formatNumber(story.navigation ?? 0)} nav</span>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Hover overlay com metricas detalhadas */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/0 transition-all duration-200 group-hover:bg-black/60">
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-              {[
-                { label: 'Alcance', value: story.reach },
-                { label: 'Navegacao', value: story.navigation ?? 0 },
-                { label: 'Respostas', value: story.replies },
-                { label: 'Shares', value: story.shares ?? 0 },
+          {!showVideo && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/0 transition-all duration-200 group-hover:bg-black/60">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                {[
+                  { label: 'Alcance', value: story.reach },
+                  { label: 'Navegacao', value: story.navigation ?? 0 },
+                  { label: 'Respostas', value: story.replies },
+                  { label: 'Shares', value: story.shares ?? 0 },
                 { label: 'Follows', value: story.follows ?? 0 },
                 { label: 'Perfil', value: story.profile_visits ?? 0 },
               ].map((m) => (
@@ -187,6 +215,7 @@ function StoryCard({ story }: { story: InstagramStory }) {
               ))}
             </div>
           </div>
+          )}
         </div>
 
         {/* Horario */}
@@ -201,6 +230,6 @@ function StoryCard({ story }: { story: InstagramStory }) {
           </p>
         </div>
       </Card>
-    </a>
+    </div>
   )
 }

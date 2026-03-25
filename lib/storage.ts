@@ -3,46 +3,54 @@ import { createServerSupabaseClient } from './supabase'
 const BUCKET = 'story-media'
 
 /**
- * Faz download de uma media URL do Instagram e salva no Supabase Storage.
+ * Faz download de uma URL e salva no Supabase Storage.
  * Retorna a URL publica persistente ou null se falhar.
  */
-export async function persistStoryMedia(
-  mediaUrl: string,
-  mediaId: string,
-  mediaType: string
+async function uploadToStorage(
+  url: string,
+  filePath: string,
+  contentType: string
 ): Promise<string | null> {
   try {
-    // Download da imagem/video do CDN do Instagram
-    const response = await fetch(mediaUrl)
+    const response = await fetch(url)
     if (!response.ok) return null
 
     const blob = await response.blob()
-    const ext = mediaType === 'VIDEO' ? 'mp4' : 'jpg'
-    const filePath = `${mediaId}.${ext}`
-
     const supabase = createServerSupabaseClient()
 
-    // Upload para Supabase Storage (upsert para nao duplicar)
     const { error } = await supabase.storage
       .from(BUCKET)
-      .upload(filePath, blob, {
-        contentType: mediaType === 'VIDEO' ? 'video/mp4' : 'image/jpeg',
-        upsert: true,
-      })
+      .upload(filePath, blob, { contentType, upsert: true })
 
     if (error) {
-      console.error(`[Storage] Upload error (${mediaId}):`, error.message)
+      console.error(`[Storage] Upload error (${filePath}):`, error.message)
       return null
     }
 
-    // Gerar URL publica
-    const { data } = supabase.storage
-      .from(BUCKET)
-      .getPublicUrl(filePath)
-
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath)
     return data.publicUrl
   } catch (err) {
-    console.error(`[Storage] Persist error (${mediaId}):`, err)
+    console.error(`[Storage] Persist error (${filePath}):`, err)
     return null
   }
+}
+
+/**
+ * Salva thumbnail (imagem) de um story no Storage.
+ */
+export async function persistStoryMedia(
+  imageUrl: string,
+  mediaId: string,
+): Promise<string | null> {
+  return uploadToStorage(imageUrl, `thumbs/${mediaId}.jpg`, 'image/jpeg')
+}
+
+/**
+ * Salva video de um story no Storage.
+ */
+export async function persistStoryVideo(
+  videoUrl: string,
+  mediaId: string,
+): Promise<string | null> {
+  return uploadToStorage(videoUrl, `videos/${mediaId}.mp4`, 'video/mp4')
 }

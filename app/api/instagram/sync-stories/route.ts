@@ -6,7 +6,7 @@ import {
   getActiveStories,
   getStoryInsights,
 } from '@/lib/meta-client'
-import { persistStoryMedia } from '@/lib/storage'
+import { persistStoryMedia, persistStoryVideo } from '@/lib/storage'
 
 export async function POST(request: Request) {
   try {
@@ -22,37 +22,40 @@ export async function POST(request: Request) {
     const token = await getAccessToken()
     const stories = await getActiveStories(token, userId)
     let syncedCount = 0
-    let storedCount = 0
+    let thumbsStored = 0
+    let videosStored = 0
 
     for (const story of stories) {
       const insights = await getStoryInsights(token, story.id)
 
-      // Story expira 24h apos publicacao
       const expiresAt = new Date(
         new Date(story.timestamp).getTime() + 24 * 60 * 60 * 1000
       ).toISOString()
 
-      // Persistir thumbnail no Supabase Storage (se ainda nao foi salvo)
-      // Para videos, usar thumbnail_url (imagem); para imagens, usar media_url
-      let storedMediaUrl: string | null = null
       const isVideo = story.media_type === 'VIDEO'
-      const imageUrl = isVideo ? story.thumbnail_url : story.media_url
 
-      if (imageUrl) {
-        // Verificar se ja existe no storage
-        const { data: existing } = await supabase
-          .from('instagram_stories')
-          .select('stored_media_url')
-          .eq('media_id', story.id)
-          .single()
+      // Verificar o que ja foi salvo
+      const { data: existing } = await supabase
+        .from('instagram_stories')
+        .select('stored_media_url, stored_video_url')
+        .eq('media_id', story.id)
+        .single()
 
-        if (existing?.stored_media_url) {
-          storedMediaUrl = existing.stored_media_url
-        } else {
-          // Sempre salvar como imagem (jpg) para thumbnails
-          storedMediaUrl = await persistStoryMedia(imageUrl, story.id, 'IMAGE')
-          if (storedMediaUrl) storedCount++
+      // Persistir thumbnail (imagem)
+      let storedMediaUrl = existing?.stored_media_url ?? null
+      if (!storedMediaUrl) {
+        const imageUrl = isVideo ? story.thumbnail_url : story.media_url
+        if (imageUrl) {
+          storedMediaUrl = await persistStoryMedia(imageUrl, story.id)
+          if (storedMediaUrl) thumbsStored++
         }
+      }
+
+      // Persistir video (se aplicavel)
+      let storedVideoUrl = existing?.stored_video_url ?? null
+      if (!storedVideoUrl && isVideo && story.media_url) {
+        storedVideoUrl = await persistStoryVideo(story.media_url, story.id)
+        if (storedVideoUrl) videosStored++
       }
 
       const { error } = await supabase.from('instagram_stories').upsert(
@@ -61,6 +64,7 @@ export async function POST(request: Request) {
           media_type: story.media_type ?? null,
           media_url: story.media_url ?? null,
           stored_media_url: storedMediaUrl,
+          stored_video_url: storedVideoUrl,
           permalink: story.permalink ?? null,
           timestamp: story.timestamp,
           expires_at: expiresAt,
@@ -86,7 +90,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       stories_synced: syncedCount,
-      media_stored: storedCount,
+      thumbs_stored: thumbsStored,
+      videos_stored: videosStored,
       total_active: stories.length,
     })
   } catch (err) {
