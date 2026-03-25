@@ -1,7 +1,7 @@
 {
   "crons": [
     { "path": "/api/instagram/sync", "schedule": "0 11 * * *" },
-    { "path": "/api/instagram/sync-stories", "schedule": "0 */6 * * *" },
+    { "path": "/api/instagram/sync-stories", "schedule": "0 14 * * *" },
     { "path": "/api/instagram/sync-audience", "schedule": "0 11 * * 1" },
     { "path": "/api/instagram/report", "schedule": "0 8 1 * *" }
   ]
