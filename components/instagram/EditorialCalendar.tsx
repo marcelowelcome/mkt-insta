@@ -103,6 +103,17 @@ export default function EditorialCalendar() {
     } catch { /* silenciar */ }
   }
 
+  const toggleAutoPublish = async (entry: EditorialEntry) => {
+    try {
+      await fetch('/api/instagram/calendar', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: entry.id, auto_publish: !entry.auto_publish }),
+      })
+      await fetchEntries()
+    } catch { /* silenciar */ }
+  }
+
   const publishEntry = async (entry: EditorialEntry) => {
     if (!entry.media_url && !entry.carousel_urls?.length) {
       const url = prompt('Cole a URL publica da imagem ou video para publicar:')
@@ -274,6 +285,12 @@ export default function EditorialCalendar() {
                                 {entry.media_url && (
                                   <div className="text-[8px] text-emerald-600 mt-0.5">📎 Midia</div>
                                 )}
+                                {entry.auto_publish && entry.status === 'APPROVED' && (
+                                  <div className="text-[8px] text-indigo-500 mt-0.5">⏰ Auto</div>
+                                )}
+                                {entry.collaborators?.length ? (
+                                  <div className="text-[8px] text-blue-500 mt-0.5">👥 Collab</div>
+                                ) : null}
                                 {/* Actions on hover */}
                                 <div className="absolute right-0.5 top-0.5 hidden gap-0.5 group-hover:flex">
                                   {entry.status === 'DRAFT' && (
@@ -292,10 +309,17 @@ export default function EditorialCalendar() {
                                   )}
                                   {entry.status === 'APPROVED' && (
                                     <button
+                                      onClick={() => toggleAutoPublish(entry)}
+                                      className={`rounded px-1 py-0.5 text-[8px] text-white ${entry.auto_publish ? 'bg-indigo-500' : 'bg-gray-400'}`}
+                                      title={entry.auto_publish ? 'Desativar auto-publish' : 'Ativar auto-publish'}
+                                    >⏰</button>
+                                  )}
+                                  {entry.status === 'APPROVED' && (
+                                    <button
                                       onClick={() => publishEntry(entry)}
                                       disabled={publishingId === entry.id}
                                       className="rounded bg-emerald-500 px-1 py-0.5 text-[8px] text-white disabled:opacity-50"
-                                      title="Publicar no Instagram"
+                                      title="Publicar no Instagram agora"
                                     >{publishingId === entry.id ? '...' : '▶'}</button>
                                   )}
                                   <button

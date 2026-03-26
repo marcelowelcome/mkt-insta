@@ -75,6 +75,14 @@ export async function POST(request: Request) {
 
     let publishedMediaId: string
 
+    // Params comuns
+    const commonParams = {
+      locationId: entry.location_id ?? undefined,
+      userTags: entry.user_tags ?? undefined,
+      altText: entry.alt_text ?? undefined,
+      collaborators: entry.collaborators ?? undefined,
+    }
+
     try {
       if (isCarousel) {
         // Carousel: criar containers filhos + container pai + publicar
@@ -84,6 +92,8 @@ export async function POST(request: Request) {
             mediaType: 'CAROUSEL',
             imageUrl: url,
             isCarouselItem: true,
+            altText: commonParams.altText,
+            userTags: commonParams.userTags,
           })
           childIds.push(childId)
         }
@@ -92,6 +102,8 @@ export async function POST(request: Request) {
           mediaType: 'CAROUSEL',
           caption,
           carouselItemIds: childIds,
+          locationId: commonParams.locationId,
+          collaborators: commonParams.collaborators,
         })
 
         publishedMediaId = await publishMedia(token, userId, parentId)
@@ -101,6 +113,9 @@ export async function POST(request: Request) {
           mediaType: 'REELS',
           videoUrl: entry.media_url,
           caption,
+          locationId: commonParams.locationId,
+          collaborators: commonParams.collaborators,
+          coverUrl: entry.cover_url ?? undefined,
         })
 
         const status = await pollContainerStatus(token, containerId)
@@ -115,6 +130,7 @@ export async function POST(request: Request) {
           mediaType: 'IMAGE',
           imageUrl: entry.media_url,
           caption,
+          ...commonParams,
         })
 
         const imgStatus = await pollContainerStatus(token, containerId, 10, 3000)

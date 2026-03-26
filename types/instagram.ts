@@ -136,6 +136,12 @@ export interface EditorialEntry {
   carousel_urls: string[] | null
   published_at: string | null
   publish_error: string | null
+  location_id: string | null
+  user_tags: Array<{ username: string; x: number; y: number }> | null
+  alt_text: string | null
+  collaborators: string[] | null
+  cover_url: string | null
+  auto_publish: boolean
   created_at: string
 }
 

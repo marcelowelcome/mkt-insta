@@ -70,6 +70,8 @@ export async function PUT(request: Request) {
     const allowedFields = [
       'scheduled_for', 'content_type', 'topic', 'caption_draft',
       'hashtags_plan', 'status', 'media_url', 'carousel_urls',
+      'location_id', 'user_tags', 'alt_text', 'collaborators',
+      'cover_url', 'auto_publish',
     ]
     const updates: Record<string, unknown> = {}
     for (const field of allowedFields) {

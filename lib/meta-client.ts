@@ -457,6 +457,11 @@ export async function createMediaContainer(
     caption?: string
     carouselItemIds?: string[]
     isCarouselItem?: boolean
+    locationId?: string
+    userTags?: Array<{ username: string; x: number; y: number }>
+    altText?: string
+    collaborators?: string[]
+    coverUrl?: string
   }
 ): Promise<string> {
   const body: Record<string, string> = { access_token: token }
@@ -464,17 +469,42 @@ export async function createMediaContainer(
   if (params.isCarouselItem) {
     body.image_url = params.imageUrl!
     body.is_carousel_item = 'true'
+    if (params.altText) body.alt_text = params.altText
+    if (params.userTags?.length) {
+      body.user_tags = JSON.stringify(params.userTags.map(t => ({
+        username: t.username, x: t.x, y: t.y,
+      })))
+    }
   } else if (params.mediaType === 'CAROUSEL') {
     body.media_type = 'CAROUSEL'
     body.children = params.carouselItemIds!.join(',')
     if (params.caption) body.caption = params.caption
+    if (params.locationId) body.location_id = params.locationId
+    if (params.collaborators?.length) {
+      body.collaborators = JSON.stringify(params.collaborators)
+    }
   } else if (params.mediaType === 'REELS') {
     body.media_type = 'REELS'
     body.video_url = params.videoUrl!
     if (params.caption) body.caption = params.caption
+    if (params.locationId) body.location_id = params.locationId
+    if (params.coverUrl) body.cover_url = params.coverUrl
+    if (params.collaborators?.length) {
+      body.collaborators = JSON.stringify(params.collaborators)
+    }
   } else {
     body.image_url = params.imageUrl!
     if (params.caption) body.caption = params.caption
+    if (params.locationId) body.location_id = params.locationId
+    if (params.altText) body.alt_text = params.altText
+    if (params.userTags?.length) {
+      body.user_tags = JSON.stringify(params.userTags.map(t => ({
+        username: t.username, x: t.x, y: t.y,
+      })))
+    }
+    if (params.collaborators?.length) {
+      body.collaborators = JSON.stringify(params.collaborators)
+    }
   }
 
   const url = `${META_API_BASE_URL}/${userId}/media`
