@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -172,13 +173,13 @@ export default function CalendarEntryEditorPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        alert(`Erro: ${data.error}`)
+        toast.error(data.error)
       } else {
-        alert(`Publicado! Media ID: ${data.mediaId}`)
+        toast.success('Publicado no Instagram!')
       }
       await loadEntry()
     } catch {
-      alert('Erro de conexao')
+      toast.error('Erro de conexao')
     } finally {
       setPublishing(false)
     }

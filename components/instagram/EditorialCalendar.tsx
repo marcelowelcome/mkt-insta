@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -54,7 +55,7 @@ export default function EditorialCalendar() {
       const res = await fetch(`/api/instagram/calendar?month=${currentMonth}`)
       const json = await res.json()
       setEntries(json.data ?? [])
-    } catch { /* silenciar */ }
+    } catch { toast.error('Erro ao carregar calendario') }
     finally { setIsLoading(false) }
   }, [currentMonth])
 
@@ -71,7 +72,7 @@ export default function EditorialCalendar() {
       setForm({ scheduled_for: '', content_type: 'REEL', topic: '', caption_draft: '' })
       setShowForm(false)
       await fetchEntries()
-    } catch { /* silenciar */ }
+    } catch { toast.error('Erro na operacao') }
   }
 
   const updateStatus = async (id: string, status: CalendarStatus) => {
@@ -82,14 +83,14 @@ export default function EditorialCalendar() {
         body: JSON.stringify({ id, status }),
       })
       await fetchEntries()
-    } catch { /* silenciar */ }
+    } catch { toast.error('Erro na operacao') }
   }
 
   const deleteEntry = async (id: string) => {
     try {
       await fetch(`/api/instagram/calendar?id=${id}`, { method: 'DELETE' })
       await fetchEntries()
-    } catch { /* silenciar */ }
+    } catch { toast.error('Erro na operacao') }
   }
 
   const setMediaUrl = async (id: string) => {
@@ -102,7 +103,7 @@ export default function EditorialCalendar() {
         body: JSON.stringify({ id, media_url: url }),
       })
       await fetchEntries()
-    } catch { /* silenciar */ }
+    } catch { toast.error('Erro na operacao') }
   }
 
   const toggleAutoPublish = async (entry: EditorialEntry) => {
@@ -113,7 +114,7 @@ export default function EditorialCalendar() {
         body: JSON.stringify({ id: entry.id, auto_publish: !entry.auto_publish }),
       })
       await fetchEntries()
-    } catch { /* silenciar */ }
+    } catch { toast.error('Erro na operacao') }
   }
 
   const publishEntry = async (entry: EditorialEntry) => {
@@ -137,11 +138,13 @@ export default function EditorialCalendar() {
       })
       const json = await res.json()
       if (!res.ok) {
-        alert(`Erro ao publicar: ${json.error}`)
+        toast.error(`Erro ao publicar: ${json.error}`)
+      } else {
+        toast.success('Publicado no Instagram!')
       }
       await fetchEntries()
     } catch {
-      alert('Erro de conexao ao publicar')
+      toast.error('Erro de conexao ao publicar')
     } finally {
       setPublishingId(null)
     }

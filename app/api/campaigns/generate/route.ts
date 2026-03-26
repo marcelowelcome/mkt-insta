@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { validateDashboardRequest } from '@/lib/auth'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { buildPrompt, type CampaignBriefing } from '@/lib/campaign/prompt-builder'
 import { extractJSON } from '@/lib/campaign/campaign-parser'
@@ -7,9 +8,10 @@ import { extractJSON } from '@/lib/campaign/campaign-parser'
 /**
  * POST /api/campaigns/generate
  * Gera uma campanha completa via Claude API com streaming.
- * Chamado pelo BriefingForm no dashboard (acao do usuario).
  */
 export async function POST(request: Request) {
+  const authError = validateDashboardRequest(request)
+  if (authError) return authError
 
   const startTime = Date.now()
 

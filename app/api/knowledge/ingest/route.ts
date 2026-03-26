@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { validateDashboardRequest } from '@/lib/auth'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { parsePDF } from '@/lib/rag/pdf-parser'
 import { chunkText } from '@/lib/rag/chunker'
@@ -10,6 +11,8 @@ import { generateEmbeddings } from '@/lib/rag/embeddings'
  * Chamado pelo dashboard (upload manual) ou cron.
  */
 export async function POST(request: Request) {
+  const authError = validateDashboardRequest(request)
+  if (authError) return authError
 
   try {
     const formData = await request.formData()
@@ -20,6 +23,15 @@ export async function POST(request: Request) {
     if (!file || !title) {
       return NextResponse.json(
         { error: 'file and title are required' },
+        { status: 400 }
+      )
+    }
+
+    // Limite de 20MB
+    const MAX_SIZE = 20 * 1024 * 1024
+    if (file.size > MAX_SIZE) {
+      return NextResponse.json(
+        { error: 'Arquivo muito grande. Maximo: 20MB' },
         { status: 400 }
       )
     }

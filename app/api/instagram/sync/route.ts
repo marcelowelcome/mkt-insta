@@ -64,75 +64,87 @@ export async function POST(request: Request) {
     let postsCount = 0
     let reelsCount = 0
 
-    for (const item of mediaItems) {
-      const isReel = item.media_product_type === 'REELS'
-      const insights = await getMediaInsights(
-        token,
-        item.id,
-        isReel ? 'REEL' : item.media_type
+    // Processar em batches paralelos de 5 para evitar rate limits
+    const BATCH_SIZE = 5
+    for (let i = 0; i < mediaItems.length; i += BATCH_SIZE) {
+      const batch = mediaItems.slice(i, i + BATCH_SIZE)
+
+      await Promise.allSettled(
+        batch.map(async (item) => {
+          try {
+            const isReel = item.media_product_type === 'REELS'
+            const insights = await getMediaInsights(
+              token,
+              item.id,
+              isReel ? 'REEL' : item.media_type
+            )
+            const hashtags = extractHashtags(item.caption ?? null)
+
+            if (isReel) {
+              const completionRate = calcCompletionRate(
+                insights.avg_watch_time ?? null,
+                null
+              )
+
+              const { error } = await supabase.from('instagram_reels').upsert(
+                {
+                  media_id: item.id,
+                  caption: item.caption ?? null,
+                  permalink: item.permalink ?? null,
+                  thumbnail_url: item.thumbnail_url ?? null,
+                  timestamp: item.timestamp,
+                  views: insights.views ?? 0,
+                  likes: insights.likes,
+                  comments: insights.comments,
+                  saves: insights.saved,
+                  shares: insights.shares,
+                  reach: insights.reach,
+                  completion_rate: completionRate,
+                  avg_watch_time_sec: insights.avg_watch_time ?? null,
+                  hashtags: hashtags.length > 0 ? hashtags : null,
+                  synced_at: new Date().toISOString(),
+                },
+                { onConflict: 'media_id' }
+              )
+              if (error) console.error(`Reel upsert error (${item.id}):`, error.message)
+              reelsCount++
+            } else {
+              const engagementRate = calcEngagementRate(
+                insights.likes,
+                insights.comments,
+                insights.saved,
+                insights.shares,
+                insights.reach
+              )
+
+              const { error } = await supabase.from('instagram_posts').upsert(
+                {
+                  media_id: item.id,
+                  media_type: item.media_type,
+                  caption: item.caption ?? null,
+                  permalink: item.permalink ?? null,
+                  thumbnail_url: item.thumbnail_url ?? null,
+                  timestamp: item.timestamp,
+                  likes: insights.likes,
+                  comments: insights.comments,
+                  saves: insights.saved,
+                  shares: insights.shares,
+                  reach: insights.reach,
+                  impressions: insights.impressions,
+                  engagement_rate: engagementRate,
+                  hashtags: hashtags.length > 0 ? hashtags : null,
+                  synced_at: new Date().toISOString(),
+                },
+                { onConflict: 'media_id' }
+              )
+              if (error) console.error(`Post upsert error (${item.id}):`, error.message)
+              postsCount++
+            }
+          } catch (err) {
+            console.error(`Media sync error (${item.id}):`, err)
+          }
+        })
       )
-      const hashtags = extractHashtags(item.caption ?? null)
-
-      if (isReel) {
-        const completionRate = calcCompletionRate(
-          insights.avg_watch_time ?? null,
-          null // duration sera atualizado depois se disponivel
-        )
-
-        const { error } = await supabase.from('instagram_reels').upsert(
-          {
-            media_id: item.id,
-            caption: item.caption ?? null,
-            permalink: item.permalink ?? null,
-            thumbnail_url: item.thumbnail_url ?? null,
-            timestamp: item.timestamp,
-            views: insights.views ?? 0,
-            likes: insights.likes,
-            comments: insights.comments,
-            saves: insights.saved,
-            shares: insights.shares,
-            reach: insights.reach,
-            completion_rate: completionRate,
-            avg_watch_time_sec: insights.avg_watch_time ?? null,
-            hashtags: hashtags.length > 0 ? hashtags : null,
-            synced_at: new Date().toISOString(),
-          },
-          { onConflict: 'media_id' }
-        )
-        if (error) console.error(`Reel upsert error (${item.id}):`, error.message)
-        reelsCount++
-      } else {
-        const engagementRate = calcEngagementRate(
-          insights.likes,
-          insights.comments,
-          insights.saved,
-          insights.shares,
-          insights.reach
-        )
-
-        const { error } = await supabase.from('instagram_posts').upsert(
-          {
-            media_id: item.id,
-            media_type: item.media_type,
-            caption: item.caption ?? null,
-            permalink: item.permalink ?? null,
-            thumbnail_url: item.thumbnail_url ?? null,
-            timestamp: item.timestamp,
-            likes: insights.likes,
-            comments: insights.comments,
-            saves: insights.saved,
-            shares: insights.shares,
-            reach: insights.reach,
-            impressions: insights.impressions,
-            engagement_rate: engagementRate,
-            hashtags: hashtags.length > 0 ? hashtags : null,
-            synced_at: new Date().toISOString(),
-          },
-          { onConflict: 'media_id' }
-        )
-        if (error) console.error(`Post upsert error (${item.id}):`, error.message)
-        postsCount++
-      }
     }
 
     // 3. Recalcular content_score de todos os posts

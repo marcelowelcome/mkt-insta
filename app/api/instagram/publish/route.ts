@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { validateDashboardRequest } from '@/lib/auth'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import {
   getAccessToken,
@@ -10,9 +11,10 @@ import {
 /**
  * POST /api/instagram/publish
  * Publica um post do calendario editorial no Instagram.
- * Fluxo: create container -> poll status (videos) -> publish
  */
 export async function POST(request: Request) {
+  const authError = validateDashboardRequest(request)
+  if (authError) return authError
   try {
     const body = await request.json()
     const { calendarEntryId } = body

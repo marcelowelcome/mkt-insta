@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -33,7 +34,7 @@ export default function CalendarKanban() {
       const json = await res.json()
       setEntries(json.data ?? [])
     } catch {
-      // silent
+      toast.error('Erro na operacao')
     } finally {
       setLoading(false)
     }
@@ -52,7 +53,7 @@ export default function CalendarKanban() {
       })
       await fetchEntries()
     } catch {
-      // silent
+      toast.error('Erro na operacao')
     }
   }
 

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { validateDashboardRequest } from '@/lib/auth'
 import { createServerSupabaseClient } from '@/lib/supabase'
 
 export async function GET(request: Request) {
@@ -30,6 +31,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const authError = validateDashboardRequest(request)
+  if (authError) return authError
+
   try {
     const body = await request.json()
     const { scheduled_for, content_type, topic, caption_draft, hashtags_plan, status } = body
@@ -61,6 +65,9 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const authError = validateDashboardRequest(request)
+  if (authError) return authError
+
   try {
     const body = await request.json()
     const { id } = body
@@ -82,6 +89,17 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
     }
 
+    // Validar enums
+    const validStatuses = ['DRAFT', 'APPROVED', 'PUBLISHED', 'CANCELLED']
+    if (updates.status && !validStatuses.includes(updates.status as string)) {
+      return NextResponse.json({ error: `Invalid status. Must be: ${validStatuses.join(', ')}` }, { status: 400 })
+    }
+
+    const validTypes = ['REEL', 'CAROUSEL', 'IMAGE', 'STORY']
+    if (updates.content_type && !validTypes.includes(updates.content_type as string)) {
+      return NextResponse.json({ error: `Invalid content_type. Must be: ${validTypes.join(', ')}` }, { status: 400 })
+    }
+
     const supabase = createServerSupabaseClient()
     const { data, error } = await supabase
       .from('instagram_editorial_calendar')
@@ -99,6 +117,9 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const authError = validateDashboardRequest(request)
+  if (authError) return authError
+
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { validateDashboardRequest } from '@/lib/auth'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { buildChatSystemPrompt } from '@/lib/campaign/system-prompt'
 
@@ -12,6 +13,9 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = validateDashboardRequest(request)
+  if (authError) return authError
+
   try {
     const { id } = await params
     const body = await request.json()

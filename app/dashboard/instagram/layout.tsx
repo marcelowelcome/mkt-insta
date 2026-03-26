@@ -89,8 +89,8 @@ export default function InstagramLayout({
           </div>
           <span className="text-sm font-bold">DashIG</span>
         </div>
-        <nav className="flex overflow-x-auto border-t px-2 py-1.5 scrollbar-hide">
-          {navItems.slice(0, 6).map((item) => {
+        <nav className="flex overflow-x-auto border-t px-2 py-1.5">
+          {navItems.map((item) => {
             const isActive =
               item.href === '/dashboard/instagram'
                 ? pathname === '/dashboard/instagram'
