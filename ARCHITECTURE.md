@@ -101,6 +101,7 @@ Supabase pgvector (document_chunks)
       /competitors/page.tsx             <- Benchmarking de concorrentes (CRUD)
       /calendar/page.tsx                <- Calendario editorial (CRUD mensal + Kanban view)
       /calendar/[id]/page.tsx           <- Editor completo de entrada com preview Instagram
+      /messages/page.tsx                <- Inbox de DMs + gestao de auto-reply rules
       /report/page.tsx                  <- Relatorio PDF mensal
 ```
 
@@ -143,6 +144,12 @@ Supabase pgvector (document_chunks)
   /export/route.ts                      <- GET exportacao CSV
   /publish/route.ts                     <- POST publica no Instagram via Meta API
   /auto-publish/route.ts               <- POST cron que publica automaticamente posts agendados
+  /messages/route.ts                    <- GET conversas / POST enviar resposta via Instagram API
+  /messages/[conversationId]/route.ts   <- GET mensagens de uma conversa
+  /auto-reply/route.ts                  <- GET/POST/PUT/DELETE regras de auto-reply
+
+/app/api/webhooks
+  /instagram/route.ts                   <- GET verify + POST recebe eventos (messages, comments)
 
 /app/api/campaigns                      <- (Campaign Studio)
   /generate/route.ts                    <- Orquestra RAG + Claude API com streaming
@@ -397,6 +404,11 @@ idx_campaigns_status ON instagram_campaigns(status)
 | `004_stories_storage.sql` | Bucket story-media + stored_media_url |
 | `005_stories_video_url.sql` | stored_video_url para videos persistidos |
 | `006_campaign_studio.sql` | pgvector, knowledge_documents, document_chunks, instagram_campaigns, campaign_posts, search_knowledge() |
+| `007_publishing_support.sql` | media_url, carousel_urls, published_at, publish_error no calendario |
+| `008_campaign_strategy_fields.sql` | format_strategy, timing_strategy, expected_results nas campanhas |
+| `009_publishing_enhancements.sql` | location_id, user_tags, alt_text, collaborators, cover_url, auto_publish |
+| `010_campaign_tags_and_grouping.sql` | tags nas campanhas, campaign_id em posts/reels/stories (GIN index) |
+| `011_messaging.sql` | conversations, messages, auto_reply_rules, reply_templates, webhook_events |
 
 ---
 
@@ -687,13 +699,15 @@ WELCOME_WEDDINGS_SITE_URL=https://www.welcomeweddings.com.br
 - [x] Vinculacao de midias reais a campanhas
 - [x] Chat estrategico com IA por campanha
 
-### Proximos passos (backlog — organizado por sprint)
+### Sprint 2: DMs Automatizados + Webhooks (CONCLUIDA)
+- [x] Webhook endpoint (GET verify + POST events) para Instagram
+- [x] Tabelas: conversations, messages, auto_reply_rules, reply_templates, webhook_events
+- [x] Inbox de DMs com chat view e polling (15s)
+- [x] Envio de resposta via Instagram Messaging API
+- [x] Auto-reply por keyword (contains/exact/starts_with) com prioridade
+- [x] UI de gestao de regras de auto-reply
 
-**Sprint 2: DMs Automatizados + Webhooks**
-- [ ] Webhook endpoint para Instagram (comments, messages, mentions)
-- [ ] Tabela instagram_messages + inbox de DMs
-- [ ] Auto-reply por keyword (preco, disponibilidade, pacotes)
-- [ ] Templates de resposta rapida
+### Proximos passos (backlog)
 
 **Sprint 3: Comentarios + Mencoes**
 - [ ] API de comentarios (ler, responder, ocultar, deletar)
