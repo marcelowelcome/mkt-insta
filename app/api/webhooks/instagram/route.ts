@@ -62,7 +62,6 @@ async function processMessageEvent(
   event: Record<string, unknown>
 ) {
   const sender = event.sender as { id: string } | undefined
-  const recipient = event.recipient as { id: string } | undefined
   const message = event.message as {
     mid: string
     text?: string
@@ -113,7 +112,7 @@ async function processMessageEvent(
 
   // 3. Check auto-reply rules
   if (message.text) {
-    await checkAndSendAutoReply(supabase, conversation.id, igUserId, message.text, recipient?.id)
+    await checkAndSendAutoReply(supabase, conversation.id, igUserId, message.text)
   }
 }
 
@@ -121,8 +120,7 @@ async function checkAndSendAutoReply(
   supabase: ReturnType<typeof createServerSupabaseClient>,
   conversationId: string,
   recipientIgId: string,
-  messageText: string,
-  _pageId: string | undefined
+  messageText: string
 ) {
   const { data: rules } = await supabase
     .from('auto_reply_rules')
