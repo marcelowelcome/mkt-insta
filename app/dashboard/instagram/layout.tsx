@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { ThemeToggle } from '@/components/ThemeToggle'
 
 const navItems = [
   { label: 'Visao Geral', href: '/dashboard/instagram', icon: '📊' },
@@ -44,6 +45,9 @@ export default function InstagramLayout({
               DashIG
             </Link>
             <p className="text-[11px] text-muted-foreground leading-none">Welcome Weddings</p>
+          </div>
+          <div className="ml-auto">
+            <ThemeToggle />
           </div>
         </div>
 

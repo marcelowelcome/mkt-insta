@@ -722,18 +722,24 @@ WELCOME_WEDDINGS_SITE_URL=https://www.welcomeweddings.com.br
 
 ### Proximos passos (backlog)
 
-**Sprint 4: Hashtags + Performance**
-- [ ] Monitoramento de hashtags via API (30 hashtags/semana)
-- [ ] Dashboard de hashtags com trends
-- [ ] Dynamic import do Recharts para reduzir bundle
+### Sprint 4: Hashtags + Performance (CONCLUIDA)
+- [x] Monitoramento de hashtags via API (ig_hashtag_search + top/recent media)
+- [x] Dashboard de hashtags com detail view (top posts + recent posts)
+- [x] Dynamic import do Recharts (-200KB no bundle inicial)
+- [x] Migration 013: monitored_hashtags + hashtag_snapshots
 
-**Sprint 5: Auth, Dark Mode, Polish**
-- [ ] Autenticacao de usuario (Supabase Auth)
+### Sprint 5: Auth, Dark Mode, Polish (CONCLUIDA)
+- [x] Supabase Auth (login, sessao, middleware)
+- [x] Pagina de login com redirecionamento
+- [x] Dark mode com next-themes (toggle no sidebar)
+- [x] ThemeProvider + ThemeToggle
+- [x] Unit tests (vitest): campaign-parser, chunker, auth (23 tests)
+- [x] Script npm test / npm test:watch
+
+### Backlog futuro
 - [ ] Role-based access (admin vs viewer)
-- [ ] Dark mode toggle
-- [ ] Accessibility pass (aria labels, keyboard nav)
-- [ ] Testes unitarios para analytics.ts e meta-client.ts
-- [ ] Integracao com Canva API para geracao de assets (futuro)
+- [ ] Accessibility pass completo (aria labels, keyboard nav)
+- [ ] Integracao com Canva API para geracao de assets
 
 ---
 
