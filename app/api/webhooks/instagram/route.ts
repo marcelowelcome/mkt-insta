@@ -122,7 +122,7 @@ async function checkAndSendAutoReply(
   conversationId: string,
   recipientIgId: string,
   messageText: string,
-  pageId: string | undefined
+  _pageId: string | undefined
 ) {
   const { data: rules } = await supabase
     .from('auto_reply_rules')
